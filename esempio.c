@@ -5,16 +5,18 @@
 #include <time.h> //time(null)
 #include <pthread.h>
 
+#define nsample 3000
+
 int white, blue;
-float ecg[50];
-int baseY = 500;
-int baseX = 100;
+float ecg[nsample];
+int baseY =  300;//500;
+int baseX =  10;//100;
 int basep = 0;
 int first= 0;
 int i, X1, X2, Y1, Y2, keyp, r, index_in;
 BITMAP *grafico;
-int altezza = 500;
-int lunghezza = 600;
+int altezza = 600;//500;
+int lunghezza = 800; //600;
 pthread_mutex_t secg = PTHREAD_MUTEX_INITIALIZER;
 pthread_t ecg_id;
 FILE *ecg_file;
@@ -23,11 +25,12 @@ char s[5];
 void *task_ecg(){
 	//srand(time(NULL));
 	float dato = 0.0;
-	if ((ecg_file = fopen("ecg_file.txt", "r")) == NULL) {
-		printf("Non posso aprire il file %s\n", "ecg_file.txt");
+	if ((ecg_file = fopen("aami3dm.txt", "r")) == NULL) {
+		printf("Non posso aprire il file %s\n", "aami3dm.txt");
 		exit(1);
 	}
 	rewind(ecg_file);
+	sleep(1);
 	for(;;){
 		//r = rand() % 50 - 25;
 		fscanf(ecg_file, "%f", &dato);
@@ -35,9 +38,9 @@ void *task_ecg(){
 		pthread_mutex_lock(&secg);
 		ecg[index_in] = dato;
 		//printf("ecg: %f\n", ecg[index_in]);
-		index_in = (index_in + 1) % 50;
+		index_in = (index_in + 1) % nsample;
 		pthread_mutex_unlock(&secg);
-		usleep(500000);
+		usleep(1388); //frequenza a 720 Hz
 	}	
 }
 
@@ -45,12 +48,12 @@ void *task_ecg(){
 void stampa(){
 	clear_bitmap(grafico);
 	pthread_mutex_lock(&secg);
-	for(i = 1; i < 50; ++i) {
+	for(i = 1; i < nsample; ++i) {
 		if (i != index_in) {	
-			X1 = baseX + (i - 1) * 5;
-			Y1 = baseY - ecg[i - 1] * 500.0F;
-			X2 = baseX + i * 5;
-			Y2 = baseY - ecg[i] * 500.0F;
+			X1 = baseX + (i - 1) * 0.25;
+			Y1 = baseY - ecg[i - 1] * 100.0F;
+			X2 = baseX + i * 0.25;
+			Y2 = baseY - ecg[i] * 100.0F;
 			line(grafico, X1, Y1, X2, Y2, white);
 			//printf("Stampata linea tra valori %f e %f\n", ecg[i - 1], ecg[i]);
 			//printf("Coordinate (%d, %d) e (%d, %d)\n", X1, Y1, X2, Y2);
@@ -62,7 +65,7 @@ void stampa(){
 
 int main(){
 	//pthread_mutex_init(&secg, null);
-	for (i = 0; i < 50; ++i)
+	for (i = 0; i < nsample; ++i)
 		ecg[i] = 0.0;
 		
 	allegro_init();

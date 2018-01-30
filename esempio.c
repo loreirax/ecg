@@ -21,6 +21,9 @@ pthread_mutex_t secg = PTHREAD_MUTEX_INITIALIZER;
 pthread_t ecg_id;
 FILE *ecg_file;
 char s[5];
+struct timespec t1;
+struct timespec t2;
+long timediff;
 
 void *task_ecg(){
 	//srand(time(NULL));
@@ -33,6 +36,8 @@ void *task_ecg(){
 	sleep(1);
 	for(;;){
 		//r = rand() % 50 - 25;
+		clock_gettime(CLOCK_MONOTONIC, &t1);
+		printf("t1 = %ld %ld\n", t1.tv_sec, t1.tv_nsec);
 		fscanf(ecg_file, "%f", &dato);
 		//printf("dato: %f\n", dato);
 		pthread_mutex_lock(&secg);
@@ -40,6 +45,10 @@ void *task_ecg(){
 		//printf("ecg: %f\n", ecg[index_in]);
 		index_in = (index_in + 1) % nsample;
 		pthread_mutex_unlock(&secg);
+		clock_gettime(CLOCK_MONOTONIC, &t2);
+		printf("t2 = %ld %ld\n", t2.tv_sec, t2.tv_nsec);
+		timediff = (t2.tv_sec*1000000 + t2.tv_nsec) - (t1.tv_sec*1000000 + t1.tv_nsec);
+		printf("Tempo lettura: %ld\n", timediff);
 		usleep(1388); //frequenza a 720 Hz
 	}	
 }

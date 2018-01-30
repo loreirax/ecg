@@ -4,82 +4,108 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
-#define nsample 34511
+#include <semaphore.h>
+#define nsample 3000
 #define ncampioni 17
 
 float 	ecg[nsample];
-float 	Y0[nsample];
-float 	Y1[nsample];
-float	Y2[nsample];
-float 	Y3[nsample];
-int 	i, j, h, contatore_soglia, primo_vincolo, contatore_qrs;
+float	X[5];
+float 	Y0[3];
+float 	Y1;
+float	Y2;
+float 	Y3;
+int 	index_in;
+int 	i, j, contatore_soglia, primo_vincolo, contatore_qrs;
 float 	maxValue, soglia1, soglia2, value;
 float	R[ncampioni + 1];
 FILE 	*ecg_file;
+pthread_mutex_t 	secg = PTHREAD_MUTEX_INITIALIZER;
+pthread_t 	ecg_id, calc_id;
+sem_t	event;
 
-float max (float v[], int start, int end){
-	float aux = v[start];
-	for(h = start + 1; h < end; ++h)
-		if (v[h] > aux)
-			aux = v[h];
-	return aux;
+void setSoglie(float last){
+	if (last > maxValue){
+		maxValue = last;
+		soglia1 = 0.8 * maxValue;
+		soglia2 = 0.1 * maxValue;
+	}
 }
 
-int main(){
+void *task_ecg(){
+	//srand(time(NULL));
 	float dato = 0.0;
-	//lettura dei valori
+	index_in = 0;
 	if ((ecg_file = fopen("ecg.txt", "r")) == NULL) {
 		printf("Non posso aprire il file %s\n", "ecg.txt");
 		exit(1);
 	}
-	for(i = 0; i < nsample; ++i){
+	rewind(ecg_file);
+	for(index_in = 0; index_in < 5; ){
 		fscanf(ecg_file, "%f", &dato);
-		ecg[i] = dato;
-		//printf("Dato %d: %f\n", i, dato);
+		pthread_mutex_lock(&secg);
+		ecg[index_in] = dato;
+		index_in = (index_in + 1) % nsample;
+		pthread_mutex_unlock(&secg);
+		printf("Dato: %f\n", dato);
+		usleep(1388); //frequenza a 720 Hz
 	}
-	
-	//algoritmo di Ahlstrom-Tompkins
-	for(i = 1; i < nsample - 1; ++i)
-		Y0[i] = fabs(ecg[i - 1] + ecg[i + 1]);
-	for(i = 2; i < nsample - 2; ++i){
-		Y1[i] = Y0[i - 1] + 2 * Y0[i] + Y0[i + 1];
-		Y2[i] = fabs(ecg[i - 2] - 2 * ecg[i] + ecg[i + 2]);
-		Y3[i] = Y1[i] + Y2[i];
+	sem_post(&event);
+	for(;;){
+		fscanf(ecg_file, "%f", &dato);
+		pthread_mutex_lock(&secg);
+		ecg[index_in] = dato;
+		index_in = (index_in + 1) % nsample;
+		pthread_mutex_unlock(&secg);
+		printf("Dato: %f\n", dato);
+		sem_post(&event);
+		usleep(1388); //frequenza a 720 Hz
 	}
-	//calcolo max(Y3)
-	maxValue = max(Y3, 2, nsample - 2);
-	printf("Max %f\n", maxValue);
-	//c'è un picco se un punto supera soglia 1 e i 6 successivi superano soglia 2
-	soglia1 = 0.8 * maxValue;
-	soglia2 = 0.1 * maxValue;
-	printf("S1 %f\n", soglia1);
-	printf("S2 %f\n", soglia2);
+}
+
+void *task_calcolo(){
+	maxValue = 0;
+	contatore_soglia = 0;
 	contatore_qrs = 0;
-	for(i = 2; i < nsample - 2; ++i){
-		//printf("i prima: %d\n", i);
-		if (Y3[i] >= soglia2 && primo_vincolo == 1){
+	
+	for(;;) {
+		sem_wait(&event);
+		pthread_mutex_lock(&secg);
+		i = (index_in - 5 + nsample) % nsample; 
+		for(j = 0; j < 5; ++j)
+			X[j] = ecg[i + j];
+		pthread_mutex_unlock(&secg);
+		//algoritmo di Ahlstrom-Tompkins per un solo Y3
+		for(i = 1; i < 3; ++i)
+			Y0[i] = fabs(X[i - 1] + X[i + 1]);
+		Y1 = Y0[i - 1] + 2 * Y0[i] + Y0[i + 1];
+		Y2 = fabs(X[i - 2] - 2 * X[i] + X[i + 2]);
+		Y3 = Y1 + Y2;
+		printf("Y3: %f\n", Y3);
+		setSoglie(Y3);
+		if (Y3 >= soglia2 && primo_vincolo == 1){
 			contatore_soglia++;
-			R[contatore_soglia] = ecg[i];
-		}
-		else {
+		} else {
 			contatore_soglia = 0;
 			primo_vincolo = 0;
 		}
-		if (Y3[i] >= soglia1 && primo_vincolo == 0){
-			primo_vincolo = 1;
-			R[0] = ecg[i];
-		}
 		
+		if (Y3 >= soglia1 && primo_vincolo == 0)
+			primo_vincolo = 1;
+			
 		if (contatore_soglia == ncampioni) {
 			contatore_qrs++;
 			contatore_soglia = 0;
 			primo_vincolo = 0;
-			value = max(R, 0, ncampioni);
-			printf("Picco di valore: %f\nIndice prima soglia: %d\n", value, i - 6);
-		}
-		//printf("i dopo: %d\n", i);
+			printf("Un picco\n");
+		}	
 	}
-	printf("I picchi trovati sono %d\n", contatore_qrs);
-	return 0;
 }
 	
+
+int main(){
+	sem_init(&event, 0, 0);	
+	pthread_create(&ecg_id, NULL, task_ecg, NULL);
+	pthread_create(&calc_id, NULL, task_calcolo, NULL);
+	pthread_join(ecg_id, NULL);
+	return 0;
+}

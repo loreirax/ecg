@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <semaphore.h>
-#define nsample 3000
+#define nsample 3800
 #define ncampioni 30
 
 //condivisi
@@ -30,7 +30,7 @@ int 	baseY =  200;//500;
 int 	baseX =  10;//100;
 BITMAP 	*grafico;
 int 	altezza = 400;//500;
-int 	lunghezza = 1150; //600;
+int 	lunghezza = 980; //600;
 
 //file dell'ecg
 FILE 	*ecg_file;
@@ -68,7 +68,7 @@ void *task_ecg(){
 		ecg[index_in] = dato;
 		index_in = (index_in + 1) % nsample;
 		pthread_mutex_unlock(&secg);
-		usleep(20000);
+		usleep(10000);
 		//usleep(1388); //frequenza a 720 Hz
 	}
 	for(;;){
@@ -99,7 +99,6 @@ void *task_calcolo(){
 			pthread_cond_wait(&sync_var, &sync_mutex);
 		sync_calcolo = 0;
 		pthread_mutex_unlock(&sync_mutex);
-		
 		pthread_mutex_lock(&secg);
 		i = (index_in - 5 + nsample) % nsample; 
 		for(j = 0; j < 5; ++j)
@@ -108,11 +107,11 @@ void *task_calcolo(){
 		//algoritmo di Ahlstrom-Tompkins per un solo Y3
 		for(i = 0; i < 3; ++i)
 			Y0[i] = fabs(X[i - 1] + X[i + 1]);
-		Y1 = Y0[i - 1] + 2 * Y0[i] + Y0[i + 1];
-		Y2 = fabs(X[i - 2] - 2 * X[i] + X[i + 2]);
+		Y1 = Y0[0] + 2 * Y0[1] + Y0[2];
+		Y2 = fabs(X[0] - 2 * X[2] + X[4]);
 		Y3 = Y1 + Y2;
 		setSoglie(Y3);
-		if (start <= 200)
+		if (start <= 1000)
 			start++;
 		else {
 			if (Y3 >= soglia2 && primo_vincolo == 1){
@@ -123,8 +122,7 @@ void *task_calcolo(){
 			}
 			
 			if (Y3 >= soglia1 && primo_vincolo == 0)
-				primo_vincolo = 1;
-				
+				primo_vincolo = 1;			
 			if (contatore_soglia == ncampioni) {
 				contatore_qrs++;
 				contatore_soglia = 0;
@@ -147,9 +145,9 @@ void *task_grafico(){
 		pthread_mutex_lock(&secg);
 		for(k = 1; k < nsample; ++k) {
 			if (k != index_in) {	
-				_x1 = baseX + (k - 1) * 1.0F;
+				_x1 = baseX + (k - 1) * 0.25F;
 				_y1 = baseY - ecg[k - 1] * 150.0F;
-				_x2 = baseX + k * 1.0F;
+				_x2 = baseX + k * 0.25F;
 				_y2 = baseY - ecg[k] * 150.0F;
 				line(grafico, _x1, _y1, _x2, _y2, white);
 			}

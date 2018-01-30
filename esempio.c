@@ -47,7 +47,7 @@ void *task_ecg(){
 		pthread_mutex_unlock(&secg);
 		clock_gettime(CLOCK_MONOTONIC, &t2);
 		printf("t2 = %ld %ld\n", t2.tv_sec, t2.tv_nsec);
-		timediff = (t2.tv_sec*1000000 + t2.tv_nsec) - (t1.tv_sec*1000000 + t1.tv_nsec);
+		timediff = (t2.tv_sec*1000000000 + t2.tv_nsec) - (t1.tv_sec*1000000000 + t1.tv_nsec);
 		printf("Tempo lettura: %ld\n", timediff);
 		usleep(1388); //frequenza a 720 Hz
 	}	

@@ -15,6 +15,23 @@
 #define unit_x 1.72
 #define unit_y 150
 
+//task
+struct	task_param {
+	//wcet
+	long	period;
+	long	deadline;
+	int	priority;
+	int	dmiss;
+	struct timespec	at;
+	struct timespec	dl;
+};
+
+struct task_param	ecg_param, freq_param, graph_param, calc_param;
+struct sched_param	ecg_par, graph_par, calc_par, freq_par;
+pthread_attr_t 	ecg_attr, graph_attr, calc_attr, freq_attr;
+
+
+
 //condivisi
 float 	ecg[nsample];
 int 	index_in;
@@ -64,23 +81,74 @@ void setSoglie(float last){
 	}
 }
 
-void *task_ecg(){
-	int	h;
-	float 	dato = 0.0;
+void time_copy(struct timespec *td, struct timespec ts){
+	td->tv_sec = ts.tv_sec;
+	td->tv_nsec = ts.tv_nsec;
+}
+
+void time_add_us(struct timespec *t, long us){
+	t->tv_sec += us / 1000000;
+	t->tv_nsec += (us % 1000000) * 1000;
+	if (t->tv_nsec > 1000000000) {
+		t->tv_nsec -= 1000000000;
+		t->tv_sec += 1;
+	}
+}
+
+int time_cmp(struct timespec t1, struct timespec t2){
+	if (t1.tv_sec > t2.tv_sec) return 1;
+	if (t1.tv_sec < t2.tv_sec) return -1;
+	if (t1.tv_nsec > t2.tv_nsec) return 1;
+	if (t1.tv_nsec < t2.tv_nsec) return -1;
+	return 0;
+}
+
+void set_period(struct task_param *tp){
+struct timespec	t;
+	clock_gettime(CLOCK_MONOTONIC, &t);
+	time_copy(&(tp->at), t);
+	time_copy(&(tp->dl), t);
+	time_add_us(&(tp->at), tp->period);
+	time_add_us(&(tp->dl), tp->deadline);
+}
+
+int deadline_miss(struct task_param *tp){
+struct timespec	now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	if (time_cmp(now, tp->dl) > 0){
+		tp->dmiss++;
+		return 1;
+	}
+	return 0;
+}
+
+void wait_for_period(struct task_param *tp){
+	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &(tp->at), NULL);
+	time_add_us(&(tp->at), tp->period);
+	time_add_us(&(tp->dl), tp->period);
+}
+
+void *task_ecg(void * arg){
+struct task_param	*tp;
+float 	dato = 0.0;
+int	h;
+	tp = (struct task_param *)arg;
 	index_in = 0;
 	if ((ecg_file = fopen("n01m.txt", "r")) == NULL) {
 		printf("Non posso aprire il file %s\n", "n01m.txt");
 		exit(1);
 	}
 	rewind(ecg_file);
+	set_period(tp);
 	for(h = 0; h < 4; ++h){
 		fscanf(ecg_file, "%f", &dato);
 		pthread_mutex_lock(&secg);
 		ecg[index_in] = dato;
 		index_in = (index_in + 1) % nsample;
 		pthread_mutex_unlock(&secg);
-		usleep(7813);
-		//usleep(1388); //frequenza a 720 Hz
+		if (deadline_miss(tp))
+			printf("Deadline missed per lettura\n");
+		wait_for_period(tp);
 	}
 	for(;;){
 		fscanf(ecg_file, "%f", &dato);
@@ -93,18 +161,22 @@ void *task_ecg(){
 		sync_grafico = 1;
 		pthread_mutex_unlock(&sync_mutex);
 		pthread_cond_broadcast(&sync_var);
-		usleep(7813);
-		//usleep(1388); //frequenza a 720 Hz
+		if (deadline_miss(tp))
+			printf("Deadline missed per lettura\n");
+		wait_for_period(tp);
 	}
 }
 
-void *task_frequenza(){
-	int	begin = 0;
-	int	sum = 0;
-	int	l;
-	char	s[3];
+void *task_frequenza(void * arg){
+int	begin = 0;
+int	sum = 0;
+int	l;
+char	s[3];
+struct task_param	*tp;
+	tp = (struct task_param *)arg;
 	index_m = 0;
-	sleep(2);
+	set_period(tp);
+	wait_for_period(tp);
 	for(;;){
 		pthread_mutex_lock(&sqrs);
 		misure[index_m] = contatore_qrs;
@@ -120,17 +192,20 @@ void *task_frequenza(){
 			sprintf(s,"%d", sum * 6);
 			clear_to_color(freq, blue);
 			textout_ex(freq, font, s, 0, 0, white, transparent);
-			blit(freq, screen, 0, 0, 100, 10, 20, 20);
+			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);
 		}
-		sleep(2);
+		if (deadline_miss(tp))
+			printf("Deadline missed per la frequenza\n");
+		wait_for_period(tp);
 	}
 }
 
 void *task_calcolo(){
-	int	i, j;
-	int	start = 0;
+int	i, j;
+int	start = 0;
 	maxValue = 0;
 	contatore_soglia = 0;
+	//set_period(tp);
 	for(;;) {
 		pthread_mutex_lock(&sync_mutex);
 		while(sync_calcolo == 0)
@@ -153,7 +228,7 @@ void *task_calcolo(){
 			start++;
 		else {
 			if (frequenza_attiva == 0){
-				pthread_create(&freq_id, NULL, task_frequenza, NULL);
+				pthread_create(&freq_id, &freq_attr, task_frequenza, &freq_param);
 				frequenza_attiva = 1;
 			}
 			if (Y3 >= soglia2 && primo_vincolo == 1)
@@ -173,12 +248,18 @@ void *task_calcolo(){
 				primo_vincolo = 0;
 				printf("Picco numero %d\n", contatore_qrs);
 			}
-		}	
+		}
+		/*if (deadline_miss(tp))
+			printf("Deadline missed per il calcolo\n");
+		wait_for_period(tp);*/	
 	}
 }
 
-void *task_grafico(){
-	int	k;
+void *task_grafico(void * arg){
+int	k;
+struct task_param	*tp;
+	tp = (struct task_param *)arg;
+	//set_period(tp);
 	for(;;){
 		pthread_mutex_lock(&sync_mutex);
 		while(sync_grafico == 0)
@@ -191,7 +272,7 @@ void *task_grafico(){
 		line(grafico, baseX, baseY + 1 * unit_y, baseX + nsample * unit_x, baseY + 1 * unit_y, light_blue); // -1mV
 		pthread_mutex_lock(&secg);
 		for(k = 1; k < nsample; ++k) {
-			if (k != index_in) {	
+			if (k < index_in || k > index_in + 5) {	
 				_x1 = baseX + (k - 1) * unit_x;
 				_y1 = baseY - ecg[k - 1] * unit_y;
 				_x2 = baseX + k * unit_x;
@@ -201,15 +282,21 @@ void *task_grafico(){
 		}
 		pthread_mutex_unlock(&secg);
 		blit(grafico, screen, 0, 0, 50, 300, lunghezza, altezza);
+		/*if (deadline_miss(tp))
+			printf("Deadline missed per il grafico\n");
+		wait_for_period(tp);*/
 	}
 }
 
 int main(){
-	int 	m;
+int 	m;
+	//variabili condivise
 	for (m = 0; m < nsample; ++m)
 		ecg[m] = 0.0;
 	contatore_qrs = 0;
 	pthread_cond_init(&sync_var, NULL);
+	
+	//grafica
 	allegro_init();
 	set_color_depth(8);
 	set_gfx_mode(GFX_AUTODETECT_WINDOWED, 1080, 720, 0, 0);
@@ -218,11 +305,50 @@ int main(){
 	freq = create_bitmap(20, 20);
 	clear_to_color(freq, blue);
 	textout_ex(freq, font, "--", 0, 0, white, transparent);
-	blit(freq, screen, 0, 0, 100, 10, 20, 20);
+	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);
 	blit(grafico, screen, 0, 0, 50, 300, lunghezza, altezza);
-	pthread_create(&ecg_id, NULL, task_ecg, NULL);
-	pthread_create(&calc_id, NULL, task_calcolo, NULL);
-	pthread_create(&graph_id, NULL, task_grafico, NULL);
+	
+	//task
+	ecg_param.period = 8000;//7813;
+	ecg_param.deadline = 8000;
+	ecg_param.priority = 32;
+	ecg_param.dmiss = 0;
+	/*calc_param.period = 7813;
+	calc_param.deadline = 7813;
+	calc_param.priority = 23;
+	calc_param.dmiss = 0;
+	graph_param.period = 7813;
+	graph_param.deadline = 7813;
+	graph_param.priority = 23;
+	graph_param.dmiss = 0;*/
+	freq_param.period = 2000000;
+	freq_param.deadline = 35000; //entro 5 campioni (che sarebbero 40000)
+	freq_param.priority = 28;
+	freq_param.dmiss = 0;
+	ecg_par.sched_priority = ecg_param.priority;
+	freq_par.sched_priority = freq_param.priority;
+	pthread_attr_init(&ecg_attr);
+	pthread_attr_init(&graph_attr);
+	pthread_attr_init(&calc_attr);
+	pthread_attr_init(&freq_attr);
+	/*
+	pthread_attr_setinheritsched(&ecg_attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&ecg_attr, SCHED_RR);
+	
+	pthread_attr_setinheritsched(&calc_attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&calc_attr, SCHED_RR);
+	
+	pthread_attr_setinheritsched(&graph_attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&graph_attr, SCHED_RR);
+	
+	pthread_attr_setinheritsched(&freq_attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&freq_attr, SCHED_RR);
+	*/
+	pthread_attr_setschedparam(&ecg_attr, &ecg_par);
+	pthread_attr_setschedparam(&freq_attr, &freq_par);
+	pthread_create(&ecg_id, &ecg_attr, task_ecg, &ecg_param);
+	pthread_create(&calc_id, &calc_attr, task_calcolo, NULL);
+	pthread_create(&graph_id, &graph_attr, task_grafico, NULL);
 	pthread_join(ecg_id, NULL);
 	return 0;
 }

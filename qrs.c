@@ -51,6 +51,14 @@ int	frequenza_attiva = 0;
 int	misure[5];
 int	index_m;
 BITMAP	*freq;
+//soglie per segnalazione
+int	frequenza_massima = 88;
+int	frequenza_minima = 80;
+int	led1_x = 20;
+int	led1_y = 40;
+int	led2_x = 20;
+int	led2_y = 130;
+BITMAP	*led_on, *led_off;
 
 //coordinate
 int 	_x1, _y1, _x2, _y2;
@@ -167,6 +175,25 @@ int	h;
 	}
 }
 
+void led(BITMAP *led1, BITMAP *led2){
+	stretch_blit(led1, screen, 0, 0, led1->w, led1->h, led1_x, led1_y, 80, 80);
+	stretch_blit(led2, screen, 0, 0, led2->w, led2->h, led2_x, led2_y, 80, 80);
+}
+
+void segnalazione_anomalie(int frequenza_registrata){
+	if (frequenza_registrata <= frequenza_minima){
+		led(led_on, led_off);
+	} else 
+		if (frequenza_registrata >= frequenza_massima){
+			led(led_off, led_on);
+		} else {
+			led(led_off, led_off);
+		}
+}
+
+
+
+
 void *task_frequenza(void * arg){
 int	begin = 0;
 int	sum = 0;
@@ -193,6 +220,7 @@ struct task_param	*tp;
 			clear_to_color(freq, blue);
 			textout_ex(freq, font, s, 0, 0, white, transparent);
 			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);
+			segnalazione_anomalie(sum * 6); // sum * 6 è la frequenza cardiaca calcolata
 		}
 		if (deadline_miss(tp))
 			printf("Deadline missed per la frequenza\n");
@@ -303,6 +331,13 @@ int 	m;
 	clear_to_color(screen, blue);
 	grafico = create_bitmap(lunghezza, altezza);
 	freq = create_bitmap(20, 20);
+	led_on = load_bitmap("led_on.tga", NULL);
+	if (!led_on)
+		printf("Couldn't load on!");
+	led_off = load_bitmap("led_off.tga", NULL);
+	if (!led_off)
+		printf("Couldn't load off!");
+	led(led_off, led_off);
 	clear_to_color(freq, blue);
 	textout_ex(freq, font, "--", 0, 0, white, transparent);
 	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);

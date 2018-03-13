@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
+#include <signal.h>
 #define nsample 550 //campioni mostrati a video
 #define nsoglia 250 //numero campioni prima del calcolo della soglia
 #define ncampioni 4 //campioni per la condizione del picco
@@ -70,6 +71,9 @@ int 	lunghezza = 980;
 
 //file dell'ecg
 FILE 	*ecg_file;
+
+//file del suono
+SAMPLE	*beep;
 
 //semafori
 pthread_mutex_t secg = PTHREAD_MUTEX_INITIALIZER;
@@ -170,14 +174,15 @@ int	h;
 		pthread_mutex_unlock(&sync_mutex);
 		pthread_cond_broadcast(&sync_var);
 		if (deadline_miss(tp))
-			printf("Deadline missed per lettura\n");
+			printf("Deadline missed per lettu<ra\n");
 		wait_for_period(tp);
 	}
 }
+END_OF_FUNCTION(task_ecg);
 
 void led(BITMAP *led1, BITMAP *led2){
-	stretch_blit(led1, screen, 0, 0, led1->w, led1->h, led1_x, led1_y, 80, 80);
-	stretch_blit(led2, screen, 0, 0, led2->w, led2->h, led2_x, led2_y, 80, 80);
+	stretch_blit(led1, screen, 0, 0, led1->w, led1->h, led1_x, led1_y, 50, 50);
+	stretch_blit(led2, screen, 0, 0, led2->w, led2->h, led2_x, led2_y, 50, 50);
 }
 
 void segnalazione_anomalie(int frequenza_registrata){
@@ -217,9 +222,9 @@ struct task_param	*tp;
 			for(l = 0; l < 5; ++l)
 				sum += misure[l];
 			sprintf(s,"%d", sum * 6);
-			clear_to_color(freq, blue);
+			clear_to_color(freq, black);
 			textout_ex(freq, font, s, 0, 0, white, transparent);
-			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);
+			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 120, 80);
 			segnalazione_anomalie(sum * 6); // sum * 6 è la frequenza cardiaca calcolata
 		}
 		if (deadline_miss(tp))
@@ -275,6 +280,8 @@ int	start = 0;
 				contatore_soglia = 0;
 				primo_vincolo = 0;
 				printf("Picco numero %d\n", contatore_qrs);
+				//play_sample(beep, 100, 128, 500, 0);
+				printf("\a");
 			}
 		}
 		/*if (deadline_miss(tp))
@@ -316,6 +323,31 @@ struct task_param	*tp;
 	}
 }
 
+void close_button_handler(){
+	pthread_kill(ecg_id, SIGKILL);
+	pthread_kill(calc_id, SIGKILL);
+	pthread_kill(graph_id, SIGKILL);
+	pthread_kill(freq_id, SIGKILL);
+}
+END_OF_FUNCTION(close_button_handler);
+void *task_
+do {
+scan = get_scancode();
+switch (scan) {
+case KEY_SPACE:
+if (naf < MAXFLY)
+task_create(nab++, btask, PER, DL,...);
+break;
+case KEY_UP:
+g = g + 1; // increase gravity
+break;
+case KEY_DOWN:
+if (g > 1) g = g - 1; // decrease gravity
+break;
+default: break;
+}
+} while (scan != KEY_ESC);
+
 int main(){
 int 	m;
 	//variabili condivise
@@ -323,24 +355,31 @@ int 	m;
 		ecg[m] = 0.0;
 	contatore_qrs = 0;
 	pthread_cond_init(&sync_var, NULL);
-	
 	//grafica
 	allegro_init();
+	LOCK_FUNCTION(close_button_handler);
+	set_close_button_callback(close_button_handler);
+	install_sound(DIGI_AUTODETECT, MIDI_NONE, 0);
+	set_config_int("sound", "quality", 1);
+	beep = load_sample("beep.wav");
+	if(beep == NULL){
+		printf("Couldn't load beep!\n");
+	}
 	set_color_depth(8);
 	set_gfx_mode(GFX_AUTODETECT_WINDOWED, 1080, 720, 0, 0);
-	clear_to_color(screen, blue);
+	clear_to_color(screen, black);
 	grafico = create_bitmap(lunghezza, altezza);
-	freq = create_bitmap(20, 20);
+	freq = create_bitmap(30, 20);
 	led_on = load_bitmap("led_on.tga", NULL);
 	if (!led_on)
-		printf("Couldn't load on!");
+		printf("Couldn't load on!\n");
 	led_off = load_bitmap("led_off.tga", NULL);
 	if (!led_off)
-		printf("Couldn't load off!");
+		printf("Couldn't load off!\n");
 	led(led_off, led_off);
-	clear_to_color(freq, blue);
+	clear_to_color(freq, black);
 	textout_ex(freq, font, "--", 0, 0, white, transparent);
-	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 80, 80);
+	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 120, 80);
 	blit(grafico, screen, 0, 0, 50, 300, lunghezza, altezza);
 	
 	//task

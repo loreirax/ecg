@@ -50,14 +50,17 @@ int	frequenza_attiva = 0;
 int	misure[5];
 int	index_m;
 BITMAP	*freq;
+int	freq_x = 900;
+int	freq_y = 50;
 
 //soglie per segnalazione
 int	frequenza_massima = 88;
 int	frequenza_minima = 80;
-int	led1_x = 20;
-int	led1_y = 40;
-int	led2_x = 20;
-int	led2_y = 130;
+int	led1_x = 70;
+int	led1_y = 50;
+int	led2_x = 70;
+int	led2_y = 140;
+int	led_dim = 50;
 BITMAP	*led_on, *led_off;
 
 //coordinate
@@ -67,6 +70,8 @@ int 	baseX =  10;
 BITMAP 	*grafico;
 int 	altezza = 400;
 int 	lunghezza = 980;
+int	grafico_x = 50;
+int	grafico_y = 300;
 
 //file dell'ecg
 FILE 	*ecg_file;
@@ -153,11 +158,11 @@ char	buf[16];
 		exit(1);
 	}
 	rewind(ecg_file);
-	//data = pack_fopen("aami3dm.txt", F_READ);
-	//if(!data){
-	//	printf("Non posso aprire il file %s\n", "n01m.txt");
-	//	exit(1);
-	//}
+	/*data = pack_fopen("aami3dm.txt", F_READ);
+	if(!data){
+		printf("Non posso aprire il file %s\n", "n01m.txt");
+		exit(1);
+	}*/
 	set_period(tp);
 	for(h = 0; h < 4; ++h){
 		fscanf(ecg_file, "%f", &dato);
@@ -192,8 +197,8 @@ char	buf[16];
 END_OF_FUNCTION(task_ecg);
 
 void led(BITMAP *led1, BITMAP *led2){
-	stretch_blit(led1, screen, 0, 0, led1->w, led1->h, led1_x, led1_y, 50, 50);
-	stretch_blit(led2, screen, 0, 0, led2->w, led2->h, led2_x, led2_y, 50, 50);
+	stretch_blit(led1, screen, 0, 0, led1->w, led1->h, led1_x, led1_y, led_dim, led_dim);
+	stretch_blit(led2, screen, 0, 0, led2->w, led2->h, led2_x, led2_y, led_dim, led_dim);
 }
 
 void segnalazione_anomalie(int frequenza_registrata){
@@ -235,7 +240,7 @@ struct task_param	*tp;
 			sprintf(s,"%d", sum * 6);
 			clear_to_color(freq, black);
 			textout_ex(freq, font, s, 0, 0, white, transparent);
-			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 120, 80);
+			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, freq_x, freq_y, 120, 80);
 			segnalazione_anomalie(sum * 6); // sum * 6 è la frequenza cardiaca calcolata
 		}
 		if (deadline_miss(tp))
@@ -292,7 +297,7 @@ int	start = 0;
 				primo_vincolo = 0;
 				printf("Picco numero %d\n", contatore_qrs);
 				//play_sample(beep, 100, 128, 500, 0);
-				if(sound_on) printf("\a");
+				//if(sound_on) printf("\a");
 			}
 		}
 		/*if (deadline_miss(tp))
@@ -327,7 +332,7 @@ struct task_param	*tp;
 			}
 		}
 		pthread_mutex_unlock(&secg);
-		blit(grafico, screen, 0, 0, 50, 300, lunghezza, altezza);
+		blit(grafico, screen, 0, 0, grafico_x, grafico_y, lunghezza, altezza);
 		/*if (deadline_miss(tp))
 			printf("Deadline missed per il grafico\n");
 		wait_for_period(tp);*/
@@ -343,7 +348,7 @@ void close_button_handler(){
 END_OF_FUNCTION(close_button_handler);
 
 char get_scancode() {
-	printf("1\n");
+	//printf("1\n");
 	//if (keypressed()){
 	//	printf("2\n");
 		return readkey() >> 8;
@@ -354,10 +359,10 @@ void *task_tastiera(){
 char 	scan;
 	do {
 		scan = get_scancode();
-		printf("3\n");
+		//printf("3\n");
 		switch (scan) {
 		case KEY_UP:
-			printf("4up\n");
+			//printf("4up\n");
 			frequenza_massima++;
 		break;
 		case KEY_DOWN:
@@ -371,7 +376,7 @@ char 	scan;
 		break;
 		case KEY_M:
 			/* muto */
-			printf("4\n");
+			//printf("4\n");
 			sound_on = !sound_on;
 			break;
 		default: break;
@@ -412,12 +417,12 @@ char	scan;
 	led(led_off, led_off);
 	clear_to_color(freq, black);
 	textout_ex(freq, font, "--", 0, 0, white, transparent);
-	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, 900, 50, 120, 80);
-	blit(grafico, screen, 0, 0, 50, 300, lunghezza, altezza);
+	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, freq_x, freq_y, 120, 80);
+	blit(grafico, screen, 0, 0, grafico_x, grafico_y, lunghezza, altezza);
 	
 	//task
-	ecg_param.period = 8000;//7813;
-	ecg_param.deadline = 8000;
+	ecg_param.period = 16000;//7813;
+	ecg_param.deadline = 16000;
 	ecg_param.priority = 32;
 	ecg_param.dmiss = 0;
 	/*calc_param.period = 7813;

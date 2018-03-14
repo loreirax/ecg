@@ -29,9 +29,7 @@ struct	task_param {
 
 struct task_param	ecg_param, freq_param, graph_param, calc_param;
 struct sched_param	ecg_par, graph_par, calc_par, freq_par;
-pthread_attr_t 	ecg_attr, graph_attr, calc_attr, freq_attr;
-
-
+pthread_attr_t 		ecg_attr, graph_attr, calc_attr, freq_attr, tast_attr;
 
 //condivisi
 float 	ecg[nsample];
@@ -52,6 +50,7 @@ int	frequenza_attiva = 0;
 int	misure[5];
 int	index_m;
 BITMAP	*freq;
+
 //soglie per segnalazione
 int	frequenza_massima = 88;
 int	frequenza_minima = 80;
@@ -71,9 +70,11 @@ int 	lunghezza = 980;
 
 //file dell'ecg
 FILE 	*ecg_file;
+PACKFILE	*data;
 
 //file del suono
 SAMPLE	*beep;
+int 	sound_on = 1;
 
 //semafori
 pthread_mutex_t secg = PTHREAD_MUTEX_INITIALIZER;
@@ -83,7 +84,7 @@ pthread_mutex_t	sync_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t	sync_var;
 
 //thread
-pthread_t 	ecg_id, calc_id, graph_id, freq_id;
+pthread_t 	ecg_id, calc_id, graph_id, freq_id, tast_id;
 
 void setSoglie(float last){
 	if (last > maxValue){
@@ -144,16 +145,24 @@ void *task_ecg(void * arg){
 struct task_param	*tp;
 float 	dato = 0.0;
 int	h;
+char	buf[16];
 	tp = (struct task_param *)arg;
 	index_in = 0;
-	if ((ecg_file = fopen("n01m.txt", "r")) == NULL) {
-		printf("Non posso aprire il file %s\n", "n01m.txt");
+	if ((ecg_file = fopen("prova_ecg.txt", "r")) == NULL) {
+		printf("Non posso aprire il file %s\n", "prova_ecg.txt");
 		exit(1);
 	}
 	rewind(ecg_file);
+	//data = pack_fopen("aami3dm.txt", F_READ);
+	//if(!data){
+	//	printf("Non posso aprire il file %s\n", "n01m.txt");
+	//	exit(1);
+	//}
 	set_period(tp);
 	for(h = 0; h < 4; ++h){
 		fscanf(ecg_file, "%f", &dato);
+		//pack_fgets(buf, sizeof(buf), data);
+		//dato = strtof(buf, NULL);
 		pthread_mutex_lock(&secg);
 		ecg[index_in] = dato;
 		index_in = (index_in + 1) % nsample;
@@ -164,6 +173,8 @@ int	h;
 	}
 	for(;;){
 		fscanf(ecg_file, "%f", &dato);
+		//pack_fgets(buf, sizeof(buf), data);
+		//dato = strtof(buf, NULL);
 		pthread_mutex_lock(&secg);
 		ecg[index_in] = dato;
 		index_in = (index_in + 1) % nsample;
@@ -174,7 +185,7 @@ int	h;
 		pthread_mutex_unlock(&sync_mutex);
 		pthread_cond_broadcast(&sync_var);
 		if (deadline_miss(tp))
-			printf("Deadline missed per lettu<ra\n");
+			printf("Deadline missed per lettura\n");
 		wait_for_period(tp);
 	}
 }
@@ -281,7 +292,7 @@ int	start = 0;
 				primo_vincolo = 0;
 				printf("Picco numero %d\n", contatore_qrs);
 				//play_sample(beep, 100, 128, 500, 0);
-				printf("\a");
+				if(sound_on) printf("\a");
 			}
 		}
 		/*if (deadline_miss(tp))
@@ -330,26 +341,47 @@ void close_button_handler(){
 	pthread_kill(freq_id, SIGKILL);
 }
 END_OF_FUNCTION(close_button_handler);
-void *task_
-do {
-scan = get_scancode();
-switch (scan) {
-case KEY_SPACE:
-if (naf < MAXFLY)
-task_create(nab++, btask, PER, DL,...);
-break;
-case KEY_UP:
-g = g + 1; // increase gravity
-break;
-case KEY_DOWN:
-if (g > 1) g = g - 1; // decrease gravity
-break;
-default: break;
+
+char get_scancode() {
+	printf("1\n");
+	//if (keypressed()){
+	//	printf("2\n");
+		return readkey() >> 8;
+	//} else return 0;
 }
-} while (scan != KEY_ESC);
+
+void *task_tastiera(){
+char 	scan;
+	do {
+		scan = get_scancode();
+		printf("3\n");
+		switch (scan) {
+		case KEY_UP:
+			printf("4up\n");
+			frequenza_massima++;
+		break;
+		case KEY_DOWN:
+			frequenza_massima--;
+		break;
+		case KEY_LEFT:
+			frequenza_minima--;
+		break;
+		case KEY_RIGHT:
+			frequenza_minima++;
+		break;
+		case KEY_M:
+			/* muto */
+			printf("4\n");
+			sound_on = !sound_on;
+			break;
+		default: break;
+		}
+	} while (scan != KEY_ESC);
+}
 
 int main(){
 int 	m;
+char	scan;
 	//variabili condivise
 	for (m = 0; m < nsample; ++m)
 		ecg[m] = 0.0;
@@ -359,12 +391,13 @@ int 	m;
 	allegro_init();
 	LOCK_FUNCTION(close_button_handler);
 	set_close_button_callback(close_button_handler);
-	install_sound(DIGI_AUTODETECT, MIDI_NONE, 0);
-	set_config_int("sound", "quality", 1);
-	beep = load_sample("beep.wav");
-	if(beep == NULL){
-		printf("Couldn't load beep!\n");
-	}
+	//install_sound(DIGI_AUTODETECT, MIDI_NONE, 0);
+	//set_config_int("sound", "quality", 1);
+	//beep = load_sample("beep.wav");
+	//if(beep == NULL){
+	//	printf("Couldn't load beep!\n");
+	//}
+	install_keyboard();
 	set_color_depth(8);
 	set_gfx_mode(GFX_AUTODETECT_WINDOWED, 1080, 720, 0, 0);
 	clear_to_color(screen, black);
@@ -405,6 +438,7 @@ int 	m;
 	pthread_attr_init(&graph_attr);
 	pthread_attr_init(&calc_attr);
 	pthread_attr_init(&freq_attr);
+	pthread_attr_init(&tast_attr);
 	/*
 	pthread_attr_setinheritsched(&ecg_attr, PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&ecg_attr, SCHED_RR);
@@ -423,6 +457,8 @@ int 	m;
 	pthread_create(&ecg_id, &ecg_attr, task_ecg, &ecg_param);
 	pthread_create(&calc_id, &calc_attr, task_calcolo, NULL);
 	pthread_create(&graph_id, &graph_attr, task_grafico, NULL);
-	pthread_join(ecg_id, NULL);
+	pthread_create(&tast_id, &tast_attr, task_tastiera, NULL);
+	pthread_join(tast_id, NULL);
+	//pthread_join(ecg_id, NULL);
 	return 0;
 }

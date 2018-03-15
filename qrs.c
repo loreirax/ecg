@@ -51,17 +51,37 @@ int	misure[5];
 int	index_m;
 BITMAP	*freq;
 int	freq_x = 900;
-int	freq_y = 50;
+int	freq_y = 65;
+
+//scritte
+BITMAP	*bradicardia, *tachicardia;
+int	lun_char = 10;
+int	alt_char = 20;
+int	zoom = 3;
+int	brad_x = 140;
+int	brad_y = 65;
+int	tac_x = 140;
+int	tac_y = 155;
 
 //soglie per segnalazione
-int	frequenza_massima = 88;
-int	frequenza_minima = 80;
+int	frequenza_massima = 130;
+int	frequenza_minima = 60;
 int	led1_x = 70;
 int	led1_y = 50;
 int	led2_x = 70;
 int	led2_y = 140;
 int	led_dim = 50;
-BITMAP	*led_on, *led_off;
+BITMAP	*led_on, *led_off, *cuore;
+BITMAP	*freq_max, *freq_min, *scritta_soglie;
+int	soglie_x = 75;
+int	soglie_y = 260;
+int	freq_min_x = 350;
+int	freq_min_y = 260;
+int	freq_max_x = 550;
+int	freq_max_y = 260;
+int	cuore_x = 820;
+int	cuore_y = 50;
+int	cuore_dim = 50;
 
 //coordinate
 int 	_x1, _y1, _x2, _y2;
@@ -212,9 +232,6 @@ void segnalazione_anomalie(int frequenza_registrata){
 		}
 }
 
-
-
-
 void *task_frequenza(void * arg){
 int	begin = 0;
 int	sum = 0;
@@ -240,7 +257,7 @@ struct task_param	*tp;
 			sprintf(s,"%d", sum * 6);
 			clear_to_color(freq, black);
 			textout_ex(freq, font, s, 0, 0, white, transparent);
-			stretch_blit(freq, screen, 0, 0,freq->w, freq->h, freq_x, freq_y, 120, 80);
+			stretch_blit(freq, screen, 0, 0, freq->w, freq->h, freq_x, freq_y, freq->w * zoom, freq->h * zoom);
 			segnalazione_anomalie(sum * 6); // sum * 6 è la frequenza cardiaca calcolata
 		}
 		if (deadline_miss(tp))
@@ -355,6 +372,20 @@ char get_scancode() {
 	//} else return 0;
 }
 
+void stampa_frequenze(){
+char	buf[16];
+	clear_bitmap(freq_min);
+	clear_bitmap(freq_max);
+	sprintf(buf, "Min %d", frequenza_minima);
+	printf("%s\n",buf);
+	textout_ex(freq_min, font, buf, 0, 0, white, transparent);
+	stretch_blit(freq_min, screen, 0, 0, freq_min->w, freq_min->h, freq_min_x, freq_min_y, freq_min->w * zoom, freq_min->h * zoom);
+	sprintf(buf, "Max %d",frequenza_massima);
+	printf("%s\n",buf);
+	textout_ex(freq_max, font, buf, 0, 0, white, transparent);
+	stretch_blit(freq_max, screen, 0, 0, freq_max->w, freq_max->h, freq_max_x, freq_max_y, freq_max->w * zoom, freq_max->h * zoom);
+}
+
 void *task_tastiera(){
 char 	scan;
 	do {
@@ -363,16 +394,20 @@ char 	scan;
 		switch (scan) {
 		case KEY_UP:
 			//printf("4up\n");
-			frequenza_massima++;
+			if (frequenza_massima < 200)
+				frequenza_massima++;
 		break;
 		case KEY_DOWN:
-			frequenza_massima--;
+			if (frequenza_massima > frequenza_minima + 1)
+				frequenza_massima--;
 		break;
 		case KEY_LEFT:
-			frequenza_minima--;
+			if (frequenza_minima > 0)
+				frequenza_minima--;
 		break;
 		case KEY_RIGHT:
-			frequenza_minima++;
+			if (frequenza_minima < frequenza_massima -1)
+				frequenza_minima++;
 		break;
 		case KEY_M:
 			/* muto */
@@ -381,6 +416,7 @@ char 	scan;
 			break;
 		default: break;
 		}
+		stampa_frequenze();
 	} while (scan != KEY_ESC);
 }
 
@@ -407,7 +443,26 @@ char	scan;
 	set_gfx_mode(GFX_AUTODETECT_WINDOWED, 1080, 720, 0, 0);
 	clear_to_color(screen, black);
 	grafico = create_bitmap(lunghezza, altezza);
-	freq = create_bitmap(30, 20);
+	cuore = load_bitmap("heart.tga", NULL);
+	if (!cuore)
+		printf("Couldn't load heart!\n");
+	stretch_blit(cuore, screen, 0, 0, cuore->w, cuore->h, cuore_x, cuore_y, cuore_dim + 5, cuore_dim);
+	freq = create_bitmap(3 * lun_char, alt_char);
+	bradicardia = create_bitmap(11 * lun_char, alt_char);
+	tachicardia = create_bitmap(11 * lun_char, alt_char);
+	clear_bitmap(bradicardia);
+	clear_bitmap(tachicardia);
+	freq_min = create_bitmap(7 * lun_char, alt_char); //3 per scritta + spazio + 3 per numero
+	freq_max = create_bitmap(7 * lun_char, alt_char);
+	scritta_soglie = create_bitmap(7 * lun_char, alt_char);
+	clear_bitmap(scritta_soglie);
+	textout_ex(scritta_soglie, font, "Soglie:", 0, 0, white, transparent);
+	stretch_blit(scritta_soglie, screen, 0, 0, scritta_soglie->w, scritta_soglie->h, soglie_x, soglie_y, scritta_soglie->w * zoom, scritta_soglie->h * zoom);
+	stampa_frequenze();
+	textout_ex(bradicardia, font, "Bradicardia", 0, 0, white, transparent);
+	stretch_blit(bradicardia, screen, 0, 0, bradicardia->w, bradicardia->h, brad_x, brad_y, bradicardia->w * zoom, bradicardia->h * zoom);
+	textout_ex(tachicardia, font, "Tachicardia", 0, 0, white, transparent);
+	stretch_blit(tachicardia, screen, 0, 0, tachicardia->w, tachicardia->h, tac_x, tac_y, tachicardia->w * zoom, tachicardia->h * zoom);
 	led_on = load_bitmap("led_on.tga", NULL);
 	if (!led_on)
 		printf("Couldn't load on!\n");
@@ -417,7 +472,7 @@ char	scan;
 	led(led_off, led_off);
 	clear_to_color(freq, black);
 	textout_ex(freq, font, "--", 0, 0, white, transparent);
-	stretch_blit(freq, screen, 0, 0,freq->w, freq->h, freq_x, freq_y, 120, 80);
+	stretch_blit(freq, screen, 0, 0, freq->w, freq->h, freq_x, freq_y, freq->w * zoom, freq->h * zoom);
 	blit(grafico, screen, 0, 0, grafico_x, grafico_y, lunghezza, altezza);
 	
 	//task

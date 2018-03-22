@@ -1,0 +1,9 @@
+Source: record aami-ec13/aami3d
+val has 1 row (signal) and 34511 columns (samples/signal)
+Duration:     0:47
+Sampling frequency: 720 Hz  Sampling interval: 0.001388888889 sec
+Row	Signal	Gain	Base	Units
+1	ECG	130	2048	mV
+
+To convert from raw units to the physical units shown
+above, subtract 'base' and divide by 'gain'.

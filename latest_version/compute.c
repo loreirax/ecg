@@ -1,17 +1,18 @@
 #include "compute.h"
-
-static float	X[5];
+//variabili per il calcolo dell'algoritmo
+static float 	X[5];
 static float 	Y0[3];
 static float 	Y1;
-static float	Y2;
+static float 	Y2;
 static float 	Y3;
-static int 	n_above;	//numero di campioni oltre la seconda soglia
-static int 	bool_t1;	//booleano superata la prima soglia
-static int 	active_fr;	//calcolo della frequenza attivo
-static float 	max_value;	//massimo valore registrato
-static float 	th_1, th_2;	//soglie
 
-void	wait_to_compute() {
+static int 	n_above; 	//numero di campioni oltre la seconda soglia
+static int 	bool_t1; 	//booleano superata la prima soglia
+static int 	active_fr; 	//calcolo della frequenza attivo
+static float 	max_value; 	//massimo valore registrato
+static float 	th_1, th_2; 	//soglie
+
+void 	wait_to_compute() {
 	pthread_mutex_lock(&sync_mutex);
 	while(sync_compute == 0)
 		pthread_cond_wait(&sync_var, &sync_mutex);
@@ -19,8 +20,8 @@ void	wait_to_compute() {
 	pthread_mutex_unlock(&sync_mutex);
 }
 
-void	copy_data() {
-int	i, j;
+void 	copy_data() {
+int 	i, j;
 	pthread_mutex_lock(&secg);
 	i = (index_in - 5 + n_shown_samples) % n_shown_samples; 
 	for(j = 0; j < 5; ++j)
@@ -28,7 +29,7 @@ int	i, j;
 	pthread_mutex_unlock(&secg);
 }
 
-void	set_threshold(float last) {
+void 	set_threshold(float last) {
 	if (last > max_value){
 		max_value = last;
 		th_1 = 0.8 * max_value;
@@ -36,8 +37,8 @@ void	set_threshold(float last) {
 	}
 }
 
-void	alg_AT() { //algoritmo di Ahlstrom-Tompkins per un solo Y3
-int	i;
+void 	alg_AT() { //algoritmo di Ahlstrom-Tompkins per un solo Y3
+int 	i;
 	for(i = 0; i < 3; ++i)
 			Y0[i] = fabs(X[i - 1] + X[i + 1]);
 		Y1 = Y0[0] + 2 * Y0[1] + Y0[2];
@@ -45,7 +46,7 @@ int	i;
 		Y3 = Y1 + Y2;
 }
 
-void	check_peak() {
+void 	check_peak() {
 	if (Y3 >= th_1 && bool_t1 == 0)
 		bool_t1 = 1;
 			
@@ -65,8 +66,8 @@ void	check_peak() {
 	}
 }
 
-void	*task_compute() {
-int	start = 0;
+void 	*task_compute() {
+int 	start = 0;
 	max_value = 0;
 	n_above = 0;
 	active_fr = 0;

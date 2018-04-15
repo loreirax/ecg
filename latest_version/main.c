@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include "main.h"
 
-static struct task_param 	read_param;
-static struct sched_param 	read_par;
+static struct task_param 	read_param, graph_param;
+static struct sched_param 	read_par, graph_par;
 static pthread_attr_t 	read_attr, graph_attr, comp_attr, kb_attr;
 static pthread_t 	read_id, comp_id, graph_id, kb_id;
 
-static BITMAP	*brad, *tac, *th_string, *heart;
+static BITMAP 	*brad, *tac, *th_string, *heart;
 
 void 	time_copy(struct timespec *td, struct timespec ts) {
 	td->tv_sec = ts.tv_sec;
@@ -22,7 +22,7 @@ void 	time_add_us(struct timespec *t, long us) {
 	}
 }
 
-int		time_cmp(struct timespec t1, struct timespec t2) {
+int 	time_cmp(struct timespec t1, struct timespec t2) {
 	if (t1.tv_sec > t2.tv_sec) return 1;
 	if (t1.tv_sec < t2.tv_sec) return -1;
 	if (t1.tv_nsec > t2.tv_nsec) return 1;
@@ -39,7 +39,7 @@ struct timespec	t;
 	time_add_us(&(tp->dl), tp->deadline);
 }
 
-int		deadline_miss(struct task_param *tp) {
+int 	deadline_miss(struct task_param *tp) {
 struct timespec	now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (time_cmp(now, tp->dl) > 0) {
@@ -73,24 +73,37 @@ END_OF_FUNCTION(close_button_handler);
 
 void 	print_limit_fr() {
 char 	buf[16];
+int 	f1, f2;
 	clear_bitmap(min_freq);
 	clear_bitmap(max_freq);
-	sprintf(buf, "Min %d", min_fr);
+	pthread_mutex_lock(&sth);
+	f1 = min_fr;
+	f2 = max_fr;
+	pthread_mutex_unlock(&sth);
+	sprintf(buf, "Min %d", f1);
 	textout_ex(min_freq, font, buf, 0, 0, white, transparent);
 	stretch_blit(min_freq, screen, 0, 0, min_freq->w, min_freq->h, min_freq_x, min_freq_y, min_freq->w * zoom, min_freq->h * zoom);
-	sprintf(buf, "Max %d", max_fr);
+	sprintf(buf, "Max %d", f2);
 	textout_ex(max_freq, font, buf, 0, 0, white, transparent);
 	stretch_blit(max_freq, screen, 0, 0, max_freq->w, max_freq->h, max_freq_x, max_freq_y, max_freq->w * zoom, max_freq->h * zoom);
 }
 
 void 	init_variables() {
 int 	m;
+pthread_mutexattr_t 	matt;
+
 	max_fr = 130;
 	min_fr = 60;
+	last_frequency = -1;
 	sync_compute = 0;
-	sync_graph = 0;
-	pthread_mutex_init(&secg, NULL);
+
+	pthread_mutexattr_init(&matt);
+	pthread_mutexattr_setprotocol(&matt, PTHREAD_PRIO_INHERIT);
+	pthread_mutex_init(&secg, &matt);
+
 	pthread_mutex_init(&sqrs, NULL);
+	pthread_mutex_init(&sfr, NULL);
+	pthread_mutex_init(&sth, NULL);
 	pthread_mutex_init(&sync_mutex, NULL);
 	for (m = 0; m < n_shown_samples; ++m)
 		ecg[m] = 0.0;
@@ -98,17 +111,22 @@ int 	m;
 	pthread_cond_init(&sync_var, NULL);
 }
 
-void	init_tasks() {
-	read_param.period = 16000;
-	read_param.deadline = 16000;
+void 	init_tasks() {
+	read_param.period = 8000;
+	read_param.deadline = 8000;
 	read_param.priority = 32;
 	read_param.dmiss = 0;
 	freq_param.period = 2000000;
 	freq_param.deadline = 35000; //entro 5 campioni (che sarebbero 40000)
 	freq_param.priority = 28;
 	freq_param.dmiss = 0;
+	graph_param.period = 16000;
+	graph_param.deadline = 16000;
+	graph_param.priority = 30;
+	graph_param.dmiss = 0;
 	read_par.sched_priority = read_param.priority;
 	freq_par.sched_priority = freq_param.priority;
+	graph_par.sched_priority = read_param.priority;
 	pthread_attr_init(&read_attr);
 	pthread_attr_init(&graph_attr);
 	pthread_attr_init(&comp_attr);
@@ -116,9 +134,10 @@ void	init_tasks() {
 	pthread_attr_init(&kb_attr);
 	pthread_attr_setschedparam(&read_attr, &read_par);
 	pthread_attr_setschedparam(&freq_attr, &freq_par);
+	pthread_attr_setschedparam(&graph_attr, &graph_par);
 	pthread_create(&read_id, &read_attr, task_read, &read_param);
 	pthread_create(&comp_id, &comp_attr, task_compute, NULL);
-	pthread_create(&graph_id, &graph_attr, task_graph, NULL);
+	pthread_create(&graph_id, &graph_attr, task_graph, &graph_param);
 	pthread_create(&kb_id, &kb_attr, task_wait_keyboard, NULL);
 }
 
@@ -176,7 +195,7 @@ void 	init_window() {
 	clear_to_color(screen, black);
 }
 
-int		main() {
+int 	main() {
 	init_variables();
 	init_window();
 	init_diseases_alert();

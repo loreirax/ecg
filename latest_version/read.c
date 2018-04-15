@@ -11,10 +11,9 @@ float 	value = 0.0;
 	pthread_mutex_unlock(&secg);
 }
 
-void 	new_data(int s1, int s2) {
+void 	new_data(int s) {
 	pthread_mutex_lock(&sync_mutex);
-	sync_compute = s1;
-	sync_graph = s2;
+	sync_compute = s;
 	pthread_mutex_unlock(&sync_mutex);
 	pthread_cond_broadcast(&sync_var);
 }
@@ -29,22 +28,21 @@ void 	file_open() {
 
 
 void *task_read(void * arg){
-struct task_param	*tp;
+struct task_param 	*tp;
 int 	h = 0;
 	tp = (struct task_param *) arg;
 	index_in = 0;
+	new_data(0);
 	file_open();
 	set_period(tp);
 	for(;;) {
 		read_value();
-		if (h < 4) {
-			new_data(0, 1);
+		if (h < 4)
 			++h;
-		} else
-			new_data(1, 1);
+		else
+			new_data(1);
 		if (deadline_miss(tp))
 			printf("Reading task: deadline missed\n");
 		wait_for_period(tp);
 	}
 }
-

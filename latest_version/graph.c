@@ -1,13 +1,32 @@
 #include "graph.h"
 
-static int 	_x1, _y1, _x2, _y2;	//coordinate dei segmenti che compongono il grafico
+static int 	_x1, _y1, _x2, _y2; 	//coordinate dei segmenti che compongono il grafico
+static int 	recorded_fr; 	//variabile di appoggio per la frequenza
 
-void 	wait_to_draw() {
-	pthread_mutex_lock(&sync_mutex);
-	while(sync_graph == 0)
-		pthread_cond_wait(&sync_var, &sync_mutex);
-	sync_graph = 0;
-	pthread_mutex_unlock(&sync_mutex);
+void 	diseases_report() {
+	if (recorded_fr <= min_fr && recorded_fr >= 0) {
+		led(led_on, led_off);
+	} else 
+		if (recorded_fr >= max_fr) {
+			led(led_off, led_on);
+		} else {
+			led(led_off, led_off);
+		}
+}
+
+void 	print_freq() {
+char 	s[3];
+	pthread_mutex_lock(&sfr);
+	recorded_fr = last_frequency;
+	pthread_mutex_unlock(&sfr);
+	if (recorded_fr < 0)
+		sprintf(s,"%s", "--");
+	else
+		sprintf(s,"%d", recorded_fr);
+	clear_to_color(freq, black);
+	textout_ex(freq, font, s, 0, 0, white, transparent);
+	stretch_blit(freq, screen, 0, 0, freq->w, freq->h, freq_x, freq_y, freq->w * zoom, freq->h * zoom);
+	diseases_report(recorded_fr);
 }
 
 void 	draw_axes() {
@@ -17,8 +36,8 @@ void 	draw_axes() {
 	line(graph, base_x, base_y + 1 * unit_y, base_x + n_shown_samples * unit_x, base_y + 1 * unit_y, light_blue); // -1mV
 }
 
-void 	draw_graph(){
-int	k;
+void 	draw_graph() {
+int 	k;
 	pthread_mutex_lock(&secg);
 	for(k = 1; k < n_shown_samples; ++k) {
 		if (k < index_in || k > index_in + 5) {	
@@ -33,11 +52,18 @@ int	k;
 	blit(graph, screen, 0, 0, graph_x, graph_y, len_graph, hgt_graph);
 }
 
-void 	*task_graph(){
+void 	*task_graph(void * arg) {
+struct task_param 	*tp;
+	tp = (struct task_param *)arg;
+	set_period(tp);
 	for(;;){
-		wait_to_draw();
 		draw_axes();
 		draw_graph();
+		print_freq();
+		diseases_report();
+		print_limit_fr();
+		if (deadline_miss(tp))
+			printf("Graphic task: deadline missed\n");
+		wait_for_period(tp);
 	}
 }
-

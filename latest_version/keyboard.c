@@ -4,6 +4,7 @@ void 	*task_wait_keyboard() {
 char 	scan;
 	do {
 		scan = readkey() >> 8;
+		pthread_mutex_lock(&sth);
 		switch (scan) {
 		case KEY_UP:
 			if (max_fr < max_admitted)
@@ -24,7 +25,7 @@ char 	scan;
 		default: 
 			break;
 		}
-		print_limit_fr();
+		pthread_mutex_unlock(&sth);
 	} while (scan != KEY_ESC);
 	//allegro_exit();
 	pthread_exit(0);

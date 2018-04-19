@@ -27,7 +27,7 @@ void 	file_open() {
 }
 
 
-void *task_read(void * arg){
+void 	*task_read(void * arg){
 struct task_param 	*tp;
 int 	h = 0;
 	tp = (struct task_param *) arg;

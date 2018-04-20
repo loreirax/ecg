@@ -7,7 +7,7 @@
 
 
 extern float 	ecg[n_shown_samples]; 	//valori dell'ecg
-
+extern int 	min_fr, max_fr; //frequenze di soglia per identificare le malattie
 extern BITMAP 	*graph; 	//bitmap per preparare il grafico
 extern BITMAP 	*freq; 	//bitmap per mostrare la frequenza a video
 

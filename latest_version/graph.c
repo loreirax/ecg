@@ -4,10 +4,15 @@ static int 	_x1, _y1, _x2, _y2; 	//coordinate dei segmenti che compongono il gra
 static int 	recorded_fr; 	//variabile di appoggio per la frequenza
 
 void 	diseases_report() {
-	if (recorded_fr <= min_fr && recorded_fr >= 0) {
+int	aux_min, aux_max;
+	pthread_mutex_lock(&sth);
+	aux_min = min_fr;
+	aux_max = max_fr;
+	pthread_mutex_unlock(&sth);
+	if (recorded_fr <= aux_min && recorded_fr >= 0) {
 		led(led_on, led_off);
 	} else 
-		if (recorded_fr >= max_fr) {
+		if (recorded_fr >= aux_max) {
 			led(led_off, led_on);
 		} else {
 			led(led_off, led_off);

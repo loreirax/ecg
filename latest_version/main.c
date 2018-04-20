@@ -92,8 +92,8 @@ void 	init_variables() {
 int 	m;
 pthread_mutexattr_t 	matt;
 
-	max_fr = 130;
-	min_fr = 60;
+	max_fr = 120;
+	min_fr = 50;
 	last_frequency = -1;
 	sync_compute = 0;
 

@@ -1,5 +1,5 @@
 #include "main.h"
-#define file_name "prova_ecg.txt"
+#define file_name "paziente_02.txt"
 
 extern float 	ecg[n_shown_samples]; 	//valori dell'ecg
 extern int 	index_in; 	//locazione prossimo dato da inserire

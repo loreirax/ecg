@@ -2,7 +2,7 @@
 #include "main.h"
 
 static struct task_param 	read_param, graph_param;
-static struct sched_param 	read_par, graph_par;
+static struct sched_param 	read_par, graph_par, kb_par, comp_par;
 static pthread_attr_t 	read_attr, graph_attr, comp_attr, kb_attr;
 static pthread_t 	read_id, comp_id, graph_id, kb_id;
 
@@ -112,21 +112,23 @@ pthread_mutexattr_t 	matt;
 }
 
 void 	init_tasks() {
-	read_param.period = 8000;
-	read_param.deadline = 8000;
+	read_param.period = 10000;
+	read_param.deadline = 10000;
 	read_param.priority = 32;
 	read_param.dmiss = 0;
 	freq_param.period = 2000000;
-	freq_param.deadline = 35000; //entro 5 campioni (che sarebbero 40000)
+	freq_param.deadline = 45000; //entro 5 campioni (che sarebbero 50000)
 	freq_param.priority = 28;
 	freq_param.dmiss = 0;
-	graph_param.period = 16000;
-	graph_param.deadline = 16000;
-	graph_param.priority = 30;
+	graph_param.period = 20000;
+	graph_param.deadline = 20000;
+	graph_param.priority = 31;
 	graph_param.dmiss = 0;
 	read_par.sched_priority = read_param.priority;
 	freq_par.sched_priority = freq_param.priority;
-	graph_par.sched_priority = read_param.priority;
+	graph_par.sched_priority = graph_param.priority;
+	kb_par.sched_priority = 26;
+	comp_par.sched_priority = 29;
 	pthread_attr_init(&read_attr);
 	pthread_attr_init(&graph_attr);
 	pthread_attr_init(&comp_attr);
@@ -135,6 +137,8 @@ void 	init_tasks() {
 	pthread_attr_setschedparam(&read_attr, &read_par);
 	pthread_attr_setschedparam(&freq_attr, &freq_par);
 	pthread_attr_setschedparam(&graph_attr, &graph_par);
+	pthread_attr_setschedparam(&comp_attr, &comp_par);
+	pthread_attr_setschedparam(&kb_attr, &kb_par);
 	pthread_create(&read_id, &read_attr, task_read, &read_param);
 	pthread_create(&comp_id, &comp_attr, task_compute, NULL);
 	pthread_create(&graph_id, &graph_attr, task_graph, &graph_param);

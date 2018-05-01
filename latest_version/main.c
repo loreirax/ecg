@@ -122,7 +122,7 @@ void 	init_tasks() {
 	freq_param.dmiss = 0;
 	graph_param.period = 20000;
 	graph_param.deadline = 20000;
-	graph_param.priority = 31;
+	graph_param.priority = 30;
 	graph_param.dmiss = 0;
 	read_par.sched_priority = read_param.priority;
 	freq_par.sched_priority = freq_param.priority;

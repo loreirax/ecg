@@ -53,7 +53,7 @@
 
 //file ecg
 #define file_name "paziente.txt"
-#define duration 6000
+#define duration 80000
 
 struct 	task_param {
 	long 	period;
